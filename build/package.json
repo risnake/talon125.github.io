@@ -1,0 +1,14 @@
+{
+  "name": "tetra-legends-build",
+  "private": true,
+  "type": "module",
+  "description": "Build tooling for the standalone/offline build. Not part of the deployed site.",
+  "scripts": {
+    "build": "node build.mjs",
+    "embed-json": "node embed-json.mjs",
+    "reencode-audio": "node reencode-audio.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

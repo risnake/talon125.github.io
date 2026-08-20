@@ -1,0 +1,89 @@
+# Publishes the standalone build (build/README.md) as a release asset.
+#
+# Run it from the Actions tab with "Run workflow", or push a tag like
+# standalone-v1.0. The zip holds the whole game -- bundle, audio, images,
+# fonts -- so it is unpacked and opened straight from disk, no server.
+# It is built --lean, which leaves out the Illustrator sources and the CJK
+# fonts; see build/README.md.
+name: Release standalone build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag for the release (e.g. standalone-v1.0)"
+        required: true
+        type: string
+      prerelease:
+        description: "Mark as a pre-release"
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "standalone-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The audio is committed already re-encoded, so this needs no ffmpeg --
+      # it only bundles the modules and embeds the JSON.
+      - name: Build
+        working-directory: build
+        run: |
+          npm ci
+          node build.mjs --copy-assets --minify --lean --outdir dist/tetra-legends-ultimate
+
+      - name: Package
+        id: package
+        run: |
+          cd build/dist
+          zip -qr9 ../../tetra-legends-ultimate-standalone.zip tetra-legends-ultimate
+          cd ../..
+          echo "size=$(du -h tetra-legends-ultimate-standalone.zip | cut -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          PRERELEASE: ${{ inputs.prerelease && '--prerelease' || '' }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Tetra Legends Ultimate, built to run from local files with no web server.
+
+          **To play:** unzip and open `index.html` in your browser.
+
+          Japanese, Chinese and Korean fall back to a system font here -- the
+          CJK web fonts are left out to keep the download down, along with the
+          Illustrator sources for the piece skins that the game never loads.
+
+          Built by `build/build.mjs`, which flattens the ES modules into one
+          script and embeds the JSON the game loads at runtime. Both are things
+          a `file://` page cannot do for itself: modules are fetched under CORS
+          rules a file origin can never satisfy, and `fetch()` refuses `file://`
+          outright.
+
+          Audio is the one rough edge. Howler requests it over XHR, which
+          `file://` refuses, so it falls back to an HTML5 `<audio>` element.
+          Sound does play, but the browser console fills with CORS errors and
+          the HTML5 pool caps how many effects can overlap, so some can drop
+          during a busy game. Serving the folder over any static web server
+          avoids that entirely.
+          NOTES
+          gh release create "$TAG" \
+            tetra-legends-ultimate-standalone.zip \
+            --title "Standalone build $TAG" \
+            --notes-file notes.md \
+            $PRERELEASE
