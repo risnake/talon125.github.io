@@ -23,10 +23,12 @@ const argv = process.argv.slice(2)
 const minify = argv.includes("--minify")
 const copyAssets = argv.includes("--copy-assets")
 const outdirFlag = argv.indexOf("--outdir")
-const OUT = path.resolve(
-  ROOT,
-  outdirFlag === -1 ? "build/dist" : argv[outdirFlag + 1]
-)
+// A path given on the command line is relative to where the command was run,
+// not to the repo; only the default is anchored to the repo.
+const OUT =
+  outdirFlag === -1
+    ? path.join(ROOT, "build/dist")
+    : path.resolve(process.cwd(), argv[outdirFlag + 1])
 
 // Google Analytics is loaded from a <script> in index.html that cannot resolve
 // offline, which would leave gtag() undefined -- and game.js calls it on every

@@ -2658,3 +2658,4 @@ dist/
 
 # Build tooling for the standalone build (see build/README.md)
 build/node_modules/
+tetra-legends-ultimate-standalone.zip
