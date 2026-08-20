@@ -2655,3 +2655,6 @@ node_modules/yargs/package.json
 node_modules/yargs/README.md
 node_modules/yargs/yargs.js
 dist/
+
+# Build tooling for the standalone build (see build/README.md)
+build/node_modules/
