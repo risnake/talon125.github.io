@@ -3,6 +3,8 @@
 # Run it from the Actions tab with "Run workflow", or push a tag like
 # standalone-v1.0. The zip holds the whole game -- bundle, audio, images,
 # fonts -- so it is unpacked and opened straight from disk, no server.
+# It is built --lean, which leaves out the Illustrator sources and the CJK
+# fonts; see build/README.md.
 name: Release standalone build
 
 on:
@@ -42,7 +44,7 @@ jobs:
         working-directory: build
         run: |
           npm ci
-          node build.mjs --copy-assets --minify --outdir dist/tetra-legends-ultimate
+          node build.mjs --copy-assets --minify --lean --outdir dist/tetra-legends-ultimate
 
       - name: Package
         id: package
@@ -62,6 +64,10 @@ jobs:
           Tetra Legends Ultimate, built to run from local files with no web server.
 
           **To play:** unzip and open `index.html` in your browser.
+
+          Japanese, Chinese and Korean fall back to a system font here -- the
+          CJK web fonts are left out to keep the download down, along with the
+          Illustrator sources for the piece skins that the game never loads.
 
           Built by `build/build.mjs`, which flattens the ES modules into one
           script and embeds the JSON the game loads at runtime. Both are things

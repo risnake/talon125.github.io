@@ -15,9 +15,20 @@ cd build && npm install
 node build/build.mjs                 # dist/ with asset folders symlinked
 node build/build.mjs --copy-assets   # dist/ that can be moved or zipped
 node build/build.mjs --minify
+node build/build.mjs --lean          # leave out assets the game never fetches
 ```
 
-Writes `build/dist/`. Open `build/dist/index.html` straight from disk — no server.
+Writes `build/dist/`, or wherever `--outdir` points — a path given on the command
+line is relative to where you ran it. Open `index.html` straight from disk; no
+server.
+
+`--lean` is for output that will be downloaded rather than served. It drops the
+`.ai` Illustrator sources for the piece skins, which nothing references, and the
+CJK web fonts, which only matter for Japanese, Chinese and Korean — those fall
+back to a system font without them. Both `woff2` and `woff` go: `style.css` lists
+`woff` as the `@font-face` fallback, so dropping only `woff2` would leave the
+browser fetching the `woff` instead and save nothing. Together that takes the
+packaged build from 164 MB to 112 MB, or 152 MB to 104 MB zipped.
 
 Two things stop the source tree from being opened as a file, and the build fixes
 both:
@@ -41,6 +52,13 @@ errors and the HTML5 pool caps how many sounds can be in flight at once, so
 effects can drop during a busy game. Serving `dist/` over any static server
 avoids this entirely. Removing the fallback means embedding the audio as blob
 URLs, which this build does not do.
+
+### Releases
+
+`.github/workflows/release-standalone.yml` builds this with `--lean` and attaches
+the zip to a GitHub release. Run it from the Actions tab, or push a tag matching
+`standalone-v*`. The audio is committed already re-encoded, so the job needs no
+ffmpeg.
 
 ## `embed-json.mjs` — JSON manifest
 

@@ -11,7 +11,10 @@
 // Asset folders are linked into the output by default so the build stays cheap
 // to re-run; pass --copy-assets for a dist/ that can be moved or zipped.
 //
-// Usage: node build/build.mjs [--minify] [--copy-assets] [--outdir DIR]
+// --lean drops assets the game never fetches, for when the output is going to
+// be downloaded rather than served. See LEAN_SKIP.
+//
+// Usage: node build/build.mjs [--minify] [--copy-assets] [--lean] [--outdir DIR]
 
 import { build } from "esbuild"
 import { readFile, writeFile, mkdir, copyFile, symlink, rm, cp } from "node:fs/promises"
@@ -22,6 +25,7 @@ const ROOT = path.resolve(import.meta.dirname, "..")
 const argv = process.argv.slice(2)
 const minify = argv.includes("--minify")
 const copyAssets = argv.includes("--copy-assets")
+const lean = argv.includes("--lean")
 const outdirFlag = argv.indexOf("--outdir")
 // A path given on the command line is relative to where the command was run,
 // not to the repo; only the default is anchored to the repo.
@@ -37,6 +41,21 @@ const GTAG_STUB = `globalThis.gtag ||= function () {};\n`
 
 // Everything the page loads by relative path once it is running.
 const ASSET_DIRS = ["bgm", "se", "vox", "img", "vid", "css", "fonts", "lib"]
+
+// Left out under --lean.
+//
+// The .ai files are Illustrator sources for the piece skins; nothing in the CSS,
+// HTML or JS points at them. The CJK fonts are referenced, but only matter for
+// Japanese, Chinese and Korean, which fall back to a system font without them.
+// Both woff2 and woff have to go: style.css lists woff as the @font-face
+// fallback, so dropping only woff2 would leave the browser fetching the woff
+// instead and save nothing.
+const LEAN_SKIP = [/\.ai$/i, /fonts\/noto-sans-(jp|sc|kr)-[^/]*\.woff2?$/i]
+
+function skipUnderLean(file) {
+  const rel = path.relative(ROOT, file).split(path.sep).join("/")
+  return LEAN_SKIP.some((pattern) => pattern.test(rel))
+}
 const ROOT_FILES = [
   "favicon.ico",
   "favicon-16x16.png",
@@ -90,7 +109,12 @@ for (const name of ROOT_FILES) {
 for (const dir of ASSET_DIRS) {
   const dest = path.join(OUT, dir)
   await rm(dest, { recursive: true, force: true })
-  if (copyAssets) await cp(path.join(ROOT, dir), dest, { recursive: true })
+  if (copyAssets) {
+    await cp(path.join(ROOT, dir), dest, {
+      recursive: true,
+      filter: (src) => !(lean && skipUnderLean(src)),
+    })
+  }
   else await symlink(path.relative(OUT, path.join(ROOT, dir)), dest, "dir")
 }
 
@@ -100,5 +124,8 @@ const kb = (n) => `${(n / 1024).toFixed(0)} KB`
 console.log(`embedded JSON : ${count} files, ${kb(bytes)}`)
 console.log(`bundle        : ${kb(bundleBytes)}${minify ? " (minified)" : ""} -> ${path.relative(ROOT, OUT)}/app.bundle.js`)
 console.log(`page          : ${path.relative(ROOT, OUT)}/index.html`)
-console.log(`assets        : ${ASSET_DIRS.length} folders ${copyAssets ? "copied" : "symlinked"}, ${ROOT_FILES.length} root files copied`)
+console.log(
+  `assets        : ${ASSET_DIRS.length} folders ${copyAssets ? "copied" : "symlinked"}, ` +
+  `${ROOT_FILES.length} root files copied${lean ? " (lean: skipped .ai sources and CJK fonts)" : ""}`
+)
 console.log(`\nOpen ${path.relative(ROOT, OUT)}/index.html directly in a browser.`)
